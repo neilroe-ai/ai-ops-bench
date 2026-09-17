@@ -14,6 +14,8 @@ For every lane in `harness/client.py`:
 1. Live rates per window vs `harness/rates.py`. Any difference → PR with provider URL + date.
 2. Peak windows vs `PEAK_WINDOWS`.
 3. Model IDs, aliases, new versions, deprecations. Floating alias moved? Flag it (telemetry `model_version`).
+   NVIDIA retires free models without notice (410 Gone): check each `nvidia-*` model ID against the
+   NVIDIA catalogue / deprecation notices; propose the replacement ID. Neil can confirm with `just nvidia-models`.
 4. Unverified lanes (`verified=False`): can base_url / model_id / thinking parameter now be confirmed?
 5. Promotional prices with expiry dates (e.g. Gemini 3.7 Flash, 1 Jan 2027).
 6. Governor invariant still holds against recorded top-ups.

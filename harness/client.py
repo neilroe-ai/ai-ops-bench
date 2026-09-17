@@ -96,22 +96,27 @@ LANES: dict[str, Lane] = {
         enabled=False,
     ),
     # NVIDIA free tier: tried first, falls back to the paid lane in shadow_of.
-    "nvidia-deepseek-v4-pro": Lane(
-        "nvidia-deepseek-v4-pro",
+    # IDs verified against the NVIDIA catalogue 2026-09-17 (V4 Pro and GLM-5.1 were retired).
+    "nvidia-deepseek-v4-flash": Lane(
+        "nvidia-deepseek-v4-flash",
         "nvidia",
         NVIDIA_BASE_URL,
-        "deepseek-ai/deepseek-v4-pro",
+        "deepseek-ai/deepseek-v4-flash-0731",  # V4 Flash (0731), older than DeepSeek's own V4.1-Flash
         "NVIDIA_API_KEY",
+        verified=True,
         billing=FREE,
-        shadow_of="deepseek-v4-pro",
+        shadow_of="deepseek-flash",
     ),
-    "nvidia-glm-5.1": Lane(
-        "nvidia-glm-5.1",
+    "nvidia-glm-5.3-flash": Lane(
+        "nvidia-glm-5.3-flash",
         "nvidia",
         NVIDIA_BASE_URL,
-        "z-ai/glm-5.1",
+        "z-ai/glm-5.3-flash",
         "NVIDIA_API_KEY",
+        # Thinking off explicitly (GLM defaults to max). Parameter name unverified on NVIDIA:
+        # check reasoning_tokens on the smoke run.
         extra_body={"chat_template_kwargs": {"thinking": False}},
+        verified=True,
         billing=FREE,
         shadow_of="deepseek-flash",  # nearest priced paid equivalent until paid GLM is priced
     ),
@@ -119,8 +124,9 @@ LANES: dict[str, Lane] = {
         "nvidia-nemotron-3-ultra",
         "nvidia",
         NVIDIA_BASE_URL,
-        "nvidia/nemotron-3-ultra",
+        "nvidia/nemotron-3-ultra-550b-a55b",
         "NVIDIA_API_KEY",
+        verified=True,
         billing=FREE,
         shadow_of="deepseek-flash",
     ),

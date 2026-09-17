@@ -359,12 +359,12 @@ def test_session_window_expires(tmp_path: Path) -> None:
 
 def test_free_lane_real_cost_zero_shadow_separate(tmp_path: Path) -> None:
     calls: list[dict[str, Any]] = []
-    result = _run(tmp_path, calls, lane_name="nvidia-deepseek-v4-pro")
+    result = _run(tmp_path, calls, lane_name="nvidia-deepseek-v4-flash")
     rows = telemetry.read(tmp_path / "t.csv")
     assert result.cost_usd == 0.0 and result.shadow_cost_usd and result.shadow_cost_usd > 0
     assert "integrate.api.nvidia.com" in calls[0]["url"]
     assert telemetry.month_spend(rows, "2026-09") == 0.0
-    assert telemetry.lane_spend(rows, "nvidia-deepseek-v4-pro") == 0.0
+    assert telemetry.lane_spend(rows, "nvidia-deepseek-v4-flash") == 0.0
     assert telemetry.window_spend(rows, MON.replace(hour=13), 6) == 0.0
     assert report.reconcile(rows).get("nvidia", 0.0) == 0.0
     [lane_report] = report.lane_matrix(rows, {})
@@ -393,10 +393,12 @@ def throttling_transport(calls: list[dict[str, Any]]) -> Any:
 
 def test_throttle_falls_back_to_paid_lane(tmp_path: Path) -> None:
     calls: list[dict[str, Any]] = []
-    result = _run(tmp_path, calls, lane_name="nvidia-deepseek-v4-pro", transport=throttling_transport(calls))
+    result = _run(
+        tmp_path, calls, lane_name="nvidia-deepseek-v4-flash", transport=throttling_transport(calls)
+    )
     rows = telemetry.read(tmp_path / "t.csv")
     assert [r["status"] for r in rows] == ["throttled", "ok"]
-    assert result.lane == "deepseek-v4-pro" and rows[1]["fallback_from"] == "nvidia-deepseek-v4-pro"
+    assert result.lane == "deepseek-flash" and rows[1]["fallback_from"] == "nvidia-deepseek-v4-flash"
     assert result.cost_usd > 0
 
 
@@ -406,16 +408,16 @@ def test_breaker_skips_free_lane_after_repeated_throttles(tmp_path: Path) -> Non
         r = dict.fromkeys(telemetry.FIELDS, "")
         r.update(
             timestamp_utc=MON.replace(hour=11, minute=50 + m).isoformat(),
-            lane="nvidia-deepseek-v4-pro",
+            lane="nvidia-deepseek-v4-flash",
             provider="nvidia",
             cost_usd="0",
             status="throttled",
         )
         telemetry.append(path, r)
     calls: list[dict[str, Any]] = []
-    result = _run(tmp_path, calls, lane_name="nvidia-deepseek-v4-pro")
+    result = _run(tmp_path, calls, lane_name="nvidia-deepseek-v4-flash")
     assert all("nvidia" not in c["url"] for c in calls)
-    assert result.lane == "deepseek-v4-pro"
+    assert result.lane == "deepseek-flash"
 
 
 # ---- Gemini promotional credit: third money type ---------------------------

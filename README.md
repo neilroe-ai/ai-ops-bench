@@ -36,11 +36,11 @@ just reconcile          # compare to provider console
 |---|---|
 | Rate windows, cost math, unpriced-model refusal | That rates match live provider pages (weekly cycle) |
 | Every ceiling refuses; budget < balances; lane ceilings < provider balance | Real API responses (fake transport only) |
-| Refused dispatch makes no call and logs nothing | Unverified lanes: GLM, Grok, Nemotron IDs/URLs |
+| Refused dispatch makes no call and logs nothing | Unverified paid lanes: GLM (Z.ai), Grok |
 | Blind packets contain no lane name | Review quality |
 | Three money types kept apart: cash (`cost_usd`), free (`shadow_cost_usd`), promotional credit (`credit_usd`) | Google promo expiry date, Prepay/Postpay, auto-reload (billing page) |
 | Credit ceilings hard, below promo balance and Tier 1 cap; prepay floor; expiry refuses; rate card switches 1 Jan 2027 | FX rate TWD→USD (approximate; reconcile in TWD) |
-| Session limit pauses; override logged; override never bypasses hard ceilings | NVIDIA model IDs (run `just nvidia-models` on the TUF) |
+| Session limit pauses; override logged; override never bypasses hard ceilings | NVIDIA retirements (weekly cycle; `just nvidia-models`) |
 | Shadow cost never enters spend, budgets or reconciliation; throttle fallback; breaker | NVIDIA free-tier terms and throttling behaviour |
 
 ## Licence

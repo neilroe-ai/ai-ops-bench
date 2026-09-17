@@ -45,10 +45,10 @@ RATES: dict[tuple[str, str], Rate] = {
     ("deepseek-v4-pro", OFF_PEAK): Rate(cache_hit=0.022, cache_miss=0.66, output=1.98),
     ("deepseek-v4-pro", PEAK): Rate(cache_hit=0.044, cache_miss=1.32, output=3.96),
     # NVIDIA build.nvidia.com free tier: explicitly $0 (priced, not unpriced). Rate-limited, best effort.
-    # Model IDs unverified: confirm with `just nvidia-models` on a machine that can reach the API.
-    ("deepseek-ai/deepseek-v4-pro", FLAT): FREE,
-    ("z-ai/glm-5.1", FLAT): FREE,
-    ("nvidia/nemotron-3-ultra", FLAT): FREE,
+    # IDs from `just nvidia-models` on 2026-09-17. NVIDIA retires models (410 Gone): recheck weekly.
+    ("deepseek-ai/deepseek-v4-flash-0731", FLAT): FREE,
+    ("z-ai/glm-5.3-flash", FLAT): FREE,
+    ("nvidia/nemotron-3-ultra-550b-a55b", FLAT): FREE,
 }
 
 # Dated rate cards: a model whose published price changes on a known date. FLAT window only.
