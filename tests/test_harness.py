@@ -479,6 +479,24 @@ def gemini_transport(calls: list[dict[str, Any]]) -> Any:
     return transport
 
 
+@pytest.fixture(autouse=True)
+def _unpark_gemini_for_credit_tests(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Gemini is parked (MD-005); the credit machinery is still tested against an enabled copy."""
+    if "credit" in request.node.name or "expired" in request.node.name:
+        import dataclasses
+
+        lanes = dict(LANES)
+        lanes["gemini-3.8-flash"] = dataclasses.replace(LANES["gemini-3.8-flash"], enabled=True)
+        monkeypatch.setattr(run, "LANES", lanes)
+
+
+def test_parked_lane_refuses_and_makes_no_call(tmp_path: Path) -> None:
+    calls: list[dict[str, Any]] = []
+    with pytest.raises(run.LaneDisabledError):
+        _gemini(tmp_path, calls)
+    assert calls == []
+
+
 def _gemini(tmp_path: Path, calls: list[dict[str, Any]], **kw: Any) -> run.RunResult:
     return _run(
         tmp_path,

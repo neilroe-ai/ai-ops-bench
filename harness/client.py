@@ -37,6 +37,8 @@ class Lane:
     billing: str = CASH
     # Paid lane that prices the shadow cost AND catches throttled/failed free calls.
     shadow_of: str | None = None
+    # Parked lanes stay defined (rates, credit rules, tests) but the runner refuses them.
+    enabled: bool = True
 
     @property
     def free(self) -> bool:
@@ -80,6 +82,7 @@ LANES: dict[str, Lane] = {
         "grok-build-0.1",
         "XAI_API_KEY",
     ),
+    # PARKED (MD-005, 2026-09-17): key blocked by API restrictions; revisit later.
     # Google AI Studio promotional credit. Thinking level set explicitly: default is medium and
     # thinking tokens bill at the output rate. Rates verified; base_url unverified until first call.
     "gemini-3.8-flash": Lane(
@@ -90,6 +93,7 @@ LANES: dict[str, Lane] = {
         "GEMINI_API_KEY",
         extra_body={"reasoning_effort": "medium"},
         billing=PROMOTIONAL,
+        enabled=False,
     ),
     # NVIDIA free tier: tried first, falls back to the paid lane in shadow_of.
     "nvidia-deepseek-v4-pro": Lane(
@@ -131,6 +135,10 @@ class MissingKeyError(RuntimeError):
     pass
 
 
+class ProviderError(RuntimeError):
+    """Non-retryable provider refusal (4xx). Carries the provider's own message."""
+
+
 @dataclass(frozen=True)
 class Usage:
     cache_hit_tokens: int
@@ -157,7 +165,8 @@ def urllib_transport(url: str, headers: Mapping[str, str], body: bytes, timeout:
     except urllib.error.HTTPError as e:
         if e.code == 429 or e.code >= 500:
             raise TransportFailure(f"HTTP {e.code}") from e
-        raise
+        detail = e.read().decode("utf-8", errors="replace")[:500]
+        raise ProviderError(f"HTTP {e.code}: {detail}") from e
     except (urllib.error.URLError, TimeoutError) as e:
         raise TransportFailure(str(e)) from e
 

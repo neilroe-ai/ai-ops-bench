@@ -20,7 +20,16 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from harness import governor, rates, telemetry
-from harness.client import LANES, Completion, Lane, Transport, TransportFailure, complete, urllib_transport
+from harness.client import (
+    LANES,
+    Completion,
+    Lane,
+    ProviderError,
+    Transport,
+    TransportFailure,
+    complete,
+    urllib_transport,
+)
 
 STANDING_INSTRUCTION = (
     "You are working on a real codebase. For diagnose and investigate tasks: do not rewrite "
@@ -37,6 +46,10 @@ BREAKER_MINUTES = 30
 FREE_LANE_TIMEOUT_S = 180.0
 
 ConfirmOverride = Callable[[str], str | None]
+
+
+class LaneDisabledError(RuntimeError):
+    """The lane is parked (enabled=False). See docs/model-decisions.md."""
 
 
 class WindowMismatchError(RuntimeError):
@@ -121,6 +134,8 @@ def run_task(
 ) -> RunResult:
     task_text = task_path.read_text(encoding="utf-8")
     lane = LANES[lane_name]
+    if not lane.enabled:
+        raise LaneDisabledError(f"{lane.name} is parked; see docs/model-decisions.md")
     rows = telemetry.read(telemetry_path)
     fallback_from = ""
     if lane.free and lane.shadow_of and breaker_open(rows, lane.name, now()):
@@ -303,7 +318,7 @@ def _attempt(
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--lane", required=True, choices=sorted(LANES))
+    p.add_argument("--lane", required=True, choices=sorted(n for n, lane in LANES.items() if lane.enabled))
     p.add_argument("--task", required=True, type=Path)
     p.add_argument("--session", required=True)
     p.add_argument("--max-output", type=int, default=8000)
@@ -323,6 +338,9 @@ def main(argv: list[str] | None = None) -> int:
     except governor.SessionLimitError:
         print("Stopped at session limit. Nothing dispatched.", file=sys.stderr)
         return 3
+    except ProviderError as e:
+        print(f"PROVIDER REFUSED: {e}", file=sys.stderr)
+        return 4
     except governor.BudgetExceededError as e:
         print(f"HARD STOP: {e}. Not overridable.", file=sys.stderr)
         return 2
