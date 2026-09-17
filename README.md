@@ -20,8 +20,8 @@ just reconcile          # compare to provider console
 | Path | Owns |
 |---|---|
 | `harness/rates.py` | Prices keyed on `(model_id, rate_window)`; peak windows. Unpriced → raises |
-| `harness/governor.py` | Monthly / session / per-lane ceilings; top-ups; budget < balances invariant |
-| `harness/client.py` | Lanes: base_url, model_id, key env, explicit thinking settings |
+| `harness/governor.py` | Hard ceilings (monthly, per-lane) and a soft session ceiling (rolling 6h: alert, pause, override with a logged reason); top-ups; budget < balances invariant |
+| `harness/client.py` | Lanes: base_url, model_id, key env, explicit thinking settings. NVIDIA free lanes (`nvidia-*`) try first and fall back to a paid lane on throttle |
 | `harness/telemetry.py` | CSV schema incl. `model_version`, `rate_window`, `reasoning_tokens`, `wall_clock_ms` |
 | `harness/run.py` | One single-turn task → one lane → one row + blind review packet |
 | `harness/report.py` | Cost per accepted task (unreviewed separated); lifetime reconciliation |
@@ -38,6 +38,8 @@ just reconcile          # compare to provider console
 | Every ceiling refuses; budget < balances; lane ceilings < provider balance | Real API responses (fake transport only) |
 | Refused dispatch makes no call and logs nothing | Unverified lanes: GLM, Grok, Nemotron IDs/URLs |
 | Blind packets contain no lane name | Review quality |
+| Session limit pauses; override logged; override never bypasses hard ceilings | NVIDIA model IDs (run `just nvidia-models` on the TUF) |
+| Shadow cost never enters spend, budgets or reconciliation; throttle fallback; breaker | NVIDIA free-tier terms and throttling behaviour |
 
 ## Licence
 

@@ -1,4 +1,4 @@
-"""Lanes: every one remote, metered, BYOK and OpenAI-compatible.
+"""Lanes: every one remote, BYOK and OpenAI-compatible; paid lanes metered, NVIDIA lanes free.
 
 A lane swap is a base_url and a key. Claude Pro is never a lane (v3 §3).
 """
@@ -8,12 +8,14 @@ from __future__ import annotations
 import json
 import os
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 JsonDict = dict[str, Any]
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 Transport = Callable[[str, Mapping[str, str], bytes, float], JsonDict]
 
 
@@ -27,6 +29,9 @@ class Lane:
     # Set thinking levels explicitly: GLM defaults to maximum when absent (v3 §5).
     extra_body: Mapping[str, Any] = field(default_factory=dict)
     verified: bool = False  # base_url/model_id checked against live provider docs
+    free: bool = False  # real cost is $0; shadow cost is reported separately, never as spend
+    # Paid lane that prices the shadow cost AND catches throttled/failed free calls.
+    shadow_of: str | None = None
 
 
 LANES: dict[str, Lane] = {
@@ -62,14 +67,40 @@ LANES: dict[str, Lane] = {
         "grok-build-0.1",
         "XAI_API_KEY",
     ),
-    "nemotron-3-ultra": Lane(
-        "nemotron-3-ultra",
+    # NVIDIA free tier: tried first, falls back to the paid lane in shadow_of.
+    "nvidia-deepseek-v4-pro": Lane(
+        "nvidia-deepseek-v4-pro",
         "nvidia",
-        "https://integrate.api.nvidia.com/v1",
+        NVIDIA_BASE_URL,
+        "deepseek-ai/deepseek-v4-pro",
+        "NVIDIA_API_KEY",
+        free=True,
+        shadow_of="deepseek-v4-pro",
+    ),
+    "nvidia-glm-5.1": Lane(
+        "nvidia-glm-5.1",
+        "nvidia",
+        NVIDIA_BASE_URL,
+        "z-ai/glm-5.1",
+        "NVIDIA_API_KEY",
+        extra_body={"chat_template_kwargs": {"thinking": False}},
+        free=True,
+        shadow_of="deepseek-flash",  # nearest priced paid equivalent until paid GLM is priced
+    ),
+    "nvidia-nemotron-3-ultra": Lane(
+        "nvidia-nemotron-3-ultra",
+        "nvidia",
+        NVIDIA_BASE_URL,
         "nvidia/nemotron-3-ultra",
         "NVIDIA_API_KEY",
+        free=True,
+        shadow_of="deepseek-flash",
     ),
 }
+
+
+class TransportFailure(RuntimeError):
+    """Throttled (429), timed out or unreachable. Triggers fallback on free lanes."""
 
 
 class MissingKeyError(RuntimeError):
@@ -95,9 +126,16 @@ class Completion:
 
 def urllib_transport(url: str, headers: Mapping[str, str], body: bytes, timeout: float) -> JsonDict:
     req = urllib.request.Request(url, data=body, headers=dict(headers), method="POST")  # noqa: S310
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
-        data: JsonDict = json.loads(resp.read().decode("utf-8"))
-        return data
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            data: JsonDict = json.loads(resp.read().decode("utf-8"))
+            return data
+    except urllib.error.HTTPError as e:
+        if e.code == 429 or e.code >= 500:
+            raise TransportFailure(f"HTTP {e.code}") from e
+        raise
+    except (urllib.error.URLError, TimeoutError) as e:
+        raise TransportFailure(str(e)) from e
 
 
 def parse_usage(usage: Mapping[str, Any]) -> Usage:

@@ -24,12 +24,14 @@ VERDICTS_PATH = Path("reviews/verdicts.csv")
 class LaneReport:
     lane: str
     runs: int
+    throttled: int
     reviewed_runs: int
     unreviewed_runs: int
     accepted_tasks: int
     reviewed_cost_usd: float
     cost_per_accepted_task: float | None
     mean_correction_rounds: float | None
+    shadow_cost_usd: float  # cost avoided on free lanes; never added to real cost
 
 
 def read_verdicts(path: Path) -> dict[str, dict[str, str]]:
@@ -42,7 +44,8 @@ def read_verdicts(path: Path) -> dict[str, dict[str, str]]:
 def lane_matrix(rows: list[telemetry.Row], verdicts: dict[str, dict[str, str]]) -> list[LaneReport]:
     out: list[LaneReport] = []
     for lane in sorted({r["lane"] for r in rows}):
-        lane_rows = [r for r in rows if r["lane"] == lane]
+        all_rows = [r for r in rows if r["lane"] == lane]
+        lane_rows = [r for r in all_rows if r["status"] != "throttled"]
         reviewed = [r for r in lane_rows if r["review_id"] in verdicts]
         accepted_tasks = {r["task_id"] for r in reviewed if verdicts[r["review_id"]]["verdict"] == "accepted"}
         # Cost of every reviewed run on a task that was eventually accepted, plus failures.
@@ -52,12 +55,14 @@ def lane_matrix(rows: list[telemetry.Row], verdicts: dict[str, dict[str, str]]) 
             LaneReport(
                 lane=lane,
                 runs=len(lane_rows),
+                throttled=len(all_rows) - len(lane_rows),
                 reviewed_runs=len(reviewed),
                 unreviewed_runs=len(lane_rows) - len(reviewed),
                 accepted_tasks=len(accepted_tasks),
                 reviewed_cost_usd=cost,
                 cost_per_accepted_task=cost / len(accepted_tasks) if accepted_tasks else None,
                 mean_correction_rounds=sum(rounds) / len(rounds) if rounds else None,
+                shadow_cost_usd=telemetry.shadow_total(lane_rows),
             )
         )
     return out
@@ -83,7 +88,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"{r.lane:18s} runs={r.runs} reviewed={r.reviewed_runs} "
             f"UNREVIEWED={r.unreviewed_runs} accepted={r.accepted_tasks} "
-            f"cost/accepted={cpat} rounds={rounds}"
+            f"cost/accepted={cpat} rounds={rounds} throttled={r.throttled} "
+            f"shadow(avoided)=${r.shadow_cost_usd:.5f}"
         )
     return 0
 

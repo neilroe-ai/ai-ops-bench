@@ -31,13 +31,20 @@ class Rate:
 
 
 # Keyed on (model_id, rate_window). Source: api-docs.deepseek.com/quick_start/pricing.
-# GLM-5.3-Flash, Grok Build 0.1 and Nemotron are deliberately absent until their
-# live rates are verified; the governor refuses to dispatch to an unpriced lane.
+# Paid GLM-5.3-Flash and Grok Build 0.1 are deliberately absent until their live rates are
+# verified; the governor refuses to dispatch to an unpriced lane.
+FREE = Rate(cache_hit=0.0, cache_miss=0.0, output=0.0)
+
 RATES: dict[tuple[str, str], Rate] = {
     ("deepseek-flash", OFF_PEAK): Rate(cache_hit=0.003, cache_miss=0.15, output=0.60),
     ("deepseek-flash", PEAK): Rate(cache_hit=0.006, cache_miss=0.30, output=1.20),
     ("deepseek-v4-pro", OFF_PEAK): Rate(cache_hit=0.022, cache_miss=0.66, output=1.98),
     ("deepseek-v4-pro", PEAK): Rate(cache_hit=0.044, cache_miss=1.32, output=3.96),
+    # NVIDIA build.nvidia.com free tier: explicitly $0 (priced, not unpriced). Rate-limited, best effort.
+    # Model IDs unverified: confirm with `just nvidia-models` on a machine that can reach the API.
+    ("deepseek-ai/deepseek-v4-pro", FLAT): FREE,
+    ("z-ai/glm-5.1", FLAT): FREE,
+    ("nvidia/nemotron-3-ultra", FLAT): FREE,
 }
 
 # Providers that price by time of day: weekdays (Mon=0..Fri=4), UTC [start, end) spans.

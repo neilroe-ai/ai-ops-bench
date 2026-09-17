@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from harness import governor, rates, report, run, telemetry
-from harness.client import LANES, MissingKeyError, complete, parse_usage
+from harness.client import LANES, MissingKeyError, TransportFailure, complete, parse_usage
 
 # 2026-09-21 is a Monday.
 MON = datetime(2026, 9, 21, tzinfo=UTC)
@@ -109,8 +109,27 @@ def test_per_lane_ceilings_fit_inside_provider_balance() -> None:
     ],
 )
 def test_each_ceiling_refuses(spend: governor.Spend) -> None:
-    with pytest.raises(governor.BudgetExceededError):
+    with pytest.raises((governor.BudgetExceededError, governor.SessionLimitError)):
         governor.authorize("deepseek-flash", 0.02, spend)
+
+
+def test_session_limit_is_soft_and_distinct() -> None:
+    spend = governor.Spend(month_usd=0, session_usd=1.99, lane_usd=0)
+    with pytest.raises(governor.SessionLimitError):
+        governor.authorize("deepseek-flash", 0.02, spend)
+    governor.authorize("deepseek-flash", 0.02, spend, session_override=True)
+
+
+@pytest.mark.parametrize(
+    "spend",
+    [
+        governor.Spend(month_usd=14.99, session_usd=5, lane_usd=0),
+        governor.Spend(month_usd=0, session_usd=5, lane_usd=9.99),
+    ],
+)
+def test_override_never_bypasses_hard_ceilings(spend: governor.Spend) -> None:
+    with pytest.raises(governor.BudgetExceededError):
+        governor.authorize("deepseek-flash", 0.02, spend, session_override=True)
 
 
 def test_unfunded_lane_has_zero_ceiling() -> None:
@@ -274,3 +293,126 @@ def test_verdicts_reader(tmp_path: Path) -> None:
             ]
         )
     assert report.read_verdicts(p)["a"]["verdict"] == "accepted"
+
+
+# ---- session alert / override ---------------------------------------------
+
+
+def _seed_spend(path: Path, cost: str, session: str, at: datetime) -> None:
+    r = dict.fromkeys(telemetry.FIELDS, "")
+    r.update(
+        timestamp_utc=at.isoformat(),
+        session_id=session,
+        lane="deepseek-flash",
+        provider="deepseek",
+        cost_usd=cost,
+        status="ok",
+    )
+    telemetry.append(path, r)
+
+
+def _run(tmp_path: Path, calls: list[dict[str, Any]], **kw: Any) -> run.RunResult:
+    args: dict[str, Any] = dict(
+        lane_name="deepseek-flash",
+        task_path=_task(tmp_path),
+        session_id="s-new",
+        telemetry_path=tmp_path / "t.csv",
+        reviews_dir=tmp_path / "rev",
+        transport=fake_transport(calls),
+        now=lambda: MON.replace(hour=12),
+        env={"DEEPSEEK_API_KEY": "k", "NVIDIA_API_KEY": "k"},
+    )
+    args.update(kw)
+    return run.run_task(**args)
+
+
+def test_session_limit_pauses_and_stops_without_reason(tmp_path: Path) -> None:
+    _seed_spend(tmp_path / "t.csv", "1.999", "s-old", MON.replace(hour=11))  # other name: still counts
+    calls: list[dict[str, Any]] = []
+    prompts: list[str] = []
+
+    def decline(message: str) -> None:
+        prompts.append(message)
+
+    with pytest.raises(governor.SessionLimitError):
+        _run(tmp_path, calls, confirm_override=decline)
+    assert len(prompts) == 1 and calls == []
+
+
+def test_session_override_proceeds_and_is_logged(tmp_path: Path) -> None:
+    _seed_spend(tmp_path / "t.csv", "1.999", "s-old", MON.replace(hour=11))
+    calls: list[dict[str, Any]] = []
+    _run(tmp_path, calls, confirm_override=lambda m: "finishing diagnose run")
+    assert len(calls) == 1
+    assert telemetry.read(tmp_path / "t.csv")[-1]["override_reason"] == "finishing diagnose run"
+
+
+def test_session_window_expires(tmp_path: Path) -> None:
+    _seed_spend(tmp_path / "t.csv", "1.999", "s-old", MON.replace(hour=5))  # 7h earlier
+    calls: list[dict[str, Any]] = []
+    _run(tmp_path, calls)
+    assert len(calls) == 1
+
+
+# ---- NVIDIA free lanes: shadow cost never becomes real money --------------
+
+
+def test_free_lane_real_cost_zero_shadow_separate(tmp_path: Path) -> None:
+    calls: list[dict[str, Any]] = []
+    result = _run(tmp_path, calls, lane_name="nvidia-deepseek-v4-pro")
+    rows = telemetry.read(tmp_path / "t.csv")
+    assert result.cost_usd == 0.0 and result.shadow_cost_usd and result.shadow_cost_usd > 0
+    assert "integrate.api.nvidia.com" in calls[0]["url"]
+    assert telemetry.month_spend(rows, "2026-09") == 0.0
+    assert telemetry.lane_spend(rows, "nvidia-deepseek-v4-pro") == 0.0
+    assert telemetry.window_spend(rows, MON.replace(hour=13), 6) == 0.0
+    assert report.reconcile(rows).get("nvidia", 0.0) == 0.0
+    [lane_report] = report.lane_matrix(rows, {})
+    assert lane_report.shadow_cost_usd == pytest.approx(result.shadow_cost_usd)
+
+
+def test_every_free_lane_is_priced_at_zero() -> None:
+    for lane in LANES.values():
+        if lane.free:
+            assert rates.get_rate(lane.model_id, rates.FLAT) == rates.FREE
+            assert lane.shadow_of in LANES and not LANES[lane.shadow_of].free
+
+
+def throttling_transport(calls: list[dict[str, Any]]) -> Any:
+    ok = fake_transport(calls)
+
+    def transport(url: str, headers: Mapping[str, str], body: bytes, timeout: float) -> dict[str, Any]:
+        if "nvidia" in url:
+            calls.append({"url": url})
+            raise TransportFailure("HTTP 429")
+        result: dict[str, Any] = ok(url, headers, body, timeout)
+        return result
+
+    return transport
+
+
+def test_throttle_falls_back_to_paid_lane(tmp_path: Path) -> None:
+    calls: list[dict[str, Any]] = []
+    result = _run(tmp_path, calls, lane_name="nvidia-deepseek-v4-pro", transport=throttling_transport(calls))
+    rows = telemetry.read(tmp_path / "t.csv")
+    assert [r["status"] for r in rows] == ["throttled", "ok"]
+    assert result.lane == "deepseek-v4-pro" and rows[1]["fallback_from"] == "nvidia-deepseek-v4-pro"
+    assert result.cost_usd > 0
+
+
+def test_breaker_skips_free_lane_after_repeated_throttles(tmp_path: Path) -> None:
+    path = tmp_path / "t.csv"
+    for m in (1, 2, 3):
+        r = dict.fromkeys(telemetry.FIELDS, "")
+        r.update(
+            timestamp_utc=MON.replace(hour=11, minute=50 + m).isoformat(),
+            lane="nvidia-deepseek-v4-pro",
+            provider="nvidia",
+            cost_usd="0",
+            status="throttled",
+        )
+        telemetry.append(path, r)
+    calls: list[dict[str, Any]] = []
+    result = _run(tmp_path, calls, lane_name="nvidia-deepseek-v4-pro")
+    assert all("nvidia" not in c["url"] for c in calls)
+    assert result.lane == "deepseek-v4-pro"

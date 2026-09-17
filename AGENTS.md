@@ -18,6 +18,13 @@ Reasoning lives in the project doc `ai-coding-agent-strategy-v3.md` (+ addenda).
 | Record a model/subscription decision | `docs/model-decisions.md` |
 | Run the weekly research cycle | `research/README.md` |
 
+## Who decides
+
+- **Which model fills each role:** Neil, from the CSV (cost per accepted task after blind review). Never an agent.
+- **Which lane a run uses:** the `--lane` given at dispatch. Free NVIDIA lanes fall back to their paid lane automatically.
+- **Proposals:** the weekly research brief proposes; Neil logs the decision in `docs/model-decisions.md`.
+- **Session override:** only Neil, interactively, with a reason. Non-interactive runs stop.
+
 ## Rules
 
 - Stdlib only in `harness/`. Dev tools (ruff, mypy, pytest) via `uv`.

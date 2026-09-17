@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Iterable, Mapping
+from datetime import datetime, timedelta
 from pathlib import Path
 
 FIELDS: tuple[str, ...] = (
@@ -26,8 +27,11 @@ FIELDS: tuple[str, ...] = (
     "output_tokens",
     "reasoning_tokens",
     "wall_clock_ms",
-    "cost_usd",
+    "cost_usd",  # REAL money only. Every budget and reconciliation reads this column.
+    "shadow_cost_usd",  # what a free call would have cost on its paid lane. Never summed as spend.
     "lane_spend_usd",
+    "fallback_from",  # free lane that failed before this paid call, if any
+    "override_reason",  # set when Neil overrode the session ceiling
     "status",
     "error",
 )
@@ -66,6 +70,17 @@ def month_spend(rows: Iterable[Row], yyyy_mm: str) -> float:
 
 def session_spend(rows: Iterable[Row], session_id: str) -> float:
     return _total(r for r in rows if r["session_id"] == session_id)
+
+
+def window_spend(rows: Iterable[Row], now: datetime, hours: int) -> float:
+    """Real spend in the last `hours`, across all session names (closes the rename loophole)."""
+    since = now - timedelta(hours=hours)
+    return _total(r for r in rows if datetime.fromisoformat(r["timestamp_utc"]) >= since)
+
+
+def shadow_total(rows: Iterable[Row]) -> float:
+    """Cost avoided by free lanes. Reporting only."""
+    return sum(float(r["shadow_cost_usd"] or 0) for r in rows)
 
 
 def lane_spend(rows: Iterable[Row], lane: str) -> float:
