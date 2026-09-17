@@ -18,6 +18,16 @@ Reasoning lives in the project doc `ai-coding-agent-strategy-v3.md` (+ addenda).
 | Record a model/subscription decision | `docs/model-decisions.md` |
 | Run the weekly research cycle | `research/README.md` |
 
+## Money types
+
+Every lane has a `billing` mode, and each is budgeted from its own CSV column. Never mix them.
+
+| Mode | Column | Limits |
+|---|---|---|
+| cash | `cost_usd` | monthly, per-lane (hard); session (soft, override with reason) |
+| free | `shadow_cost_usd` | none — reporting only ("cost avoided") |
+| promotional | `credit_usd` | credit lifetime + monthly ceilings, expiry, prepay floor (all hard) |
+
 ## Who decides
 
 - **Which model fills each role:** Neil, from the CSV (cost per accepted task after blind review). Never an agent.

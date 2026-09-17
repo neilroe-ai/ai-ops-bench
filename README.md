@@ -19,7 +19,7 @@ just reconcile          # compare to provider console
 
 | Path | Owns |
 |---|---|
-| `harness/rates.py` | Prices keyed on `(model_id, rate_window)`; peak windows. Unpriced → raises |
+| `harness/rates.py` | Prices keyed on `(model_id, rate_window)`; peak windows; dated rate cards (Gemini 2026 → 2027). Unpriced → raises |
 | `harness/governor.py` | Hard ceilings (monthly, per-lane) and a soft session ceiling (rolling 6h: alert, pause, override with a logged reason); top-ups; budget < balances invariant |
 | `harness/client.py` | Lanes: base_url, model_id, key env, explicit thinking settings. NVIDIA free lanes (`nvidia-*`) try first and fall back to a paid lane on throttle |
 | `harness/telemetry.py` | CSV schema incl. `model_version`, `rate_window`, `reasoning_tokens`, `wall_clock_ms` |
@@ -38,6 +38,8 @@ just reconcile          # compare to provider console
 | Every ceiling refuses; budget < balances; lane ceilings < provider balance | Real API responses (fake transport only) |
 | Refused dispatch makes no call and logs nothing | Unverified lanes: GLM, Grok, Nemotron IDs/URLs |
 | Blind packets contain no lane name | Review quality |
+| Three money types kept apart: cash (`cost_usd`), free (`shadow_cost_usd`), promotional credit (`credit_usd`) | Google promo expiry date, Prepay/Postpay, auto-reload (billing page) |
+| Credit ceilings hard, below promo balance and Tier 1 cap; prepay floor; expiry refuses; rate card switches 1 Jan 2027 | FX rate TWD→USD (approximate; reconcile in TWD) |
 | Session limit pauses; override logged; override never bypasses hard ceilings | NVIDIA model IDs (run `just nvidia-models` on the TUF) |
 | Shadow cost never enters spend, budgets or reconciliation; throttle fallback; breaker | NVIDIA free-tier terms and throttling behaviour |
 

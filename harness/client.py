@@ -16,6 +16,11 @@ from typing import Any
 
 JsonDict = dict[str, Any]
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+
+# Billing modes: which money a lane spends. Every budget reads the matching CSV column.
+CASH = "cash"  # prepaid balance; cost_usd; monthly/session/lane ceilings
+FREE = "free"  # $0; shadow_cost_usd for reporting only
+PROMOTIONAL = "promotional"  # provider credit that runs out; credit_usd; credit ceilings
 Transport = Callable[[str, Mapping[str, str], bytes, float], JsonDict]
 
 
@@ -29,9 +34,17 @@ class Lane:
     # Set thinking levels explicitly: GLM defaults to maximum when absent (v3 §5).
     extra_body: Mapping[str, Any] = field(default_factory=dict)
     verified: bool = False  # base_url/model_id checked against live provider docs
-    free: bool = False  # real cost is $0; shadow cost is reported separately, never as spend
+    billing: str = CASH
     # Paid lane that prices the shadow cost AND catches throttled/failed free calls.
     shadow_of: str | None = None
+
+    @property
+    def free(self) -> bool:
+        return self.billing == FREE
+
+    @property
+    def promotional(self) -> bool:
+        return self.billing == PROMOTIONAL
 
 
 LANES: dict[str, Lane] = {
@@ -67,6 +80,17 @@ LANES: dict[str, Lane] = {
         "grok-build-0.1",
         "XAI_API_KEY",
     ),
+    # Google AI Studio promotional credit. Thinking level set explicitly: default is medium and
+    # thinking tokens bill at the output rate. Rates verified; base_url unverified until first call.
+    "gemini-3.8-flash": Lane(
+        "gemini-3.8-flash",
+        "google",
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+        "gemini-3.8-flash",
+        "GEMINI_API_KEY",
+        extra_body={"reasoning_effort": "medium"},
+        billing=PROMOTIONAL,
+    ),
     # NVIDIA free tier: tried first, falls back to the paid lane in shadow_of.
     "nvidia-deepseek-v4-pro": Lane(
         "nvidia-deepseek-v4-pro",
@@ -74,7 +98,7 @@ LANES: dict[str, Lane] = {
         NVIDIA_BASE_URL,
         "deepseek-ai/deepseek-v4-pro",
         "NVIDIA_API_KEY",
-        free=True,
+        billing=FREE,
         shadow_of="deepseek-v4-pro",
     ),
     "nvidia-glm-5.1": Lane(
@@ -84,7 +108,7 @@ LANES: dict[str, Lane] = {
         "z-ai/glm-5.1",
         "NVIDIA_API_KEY",
         extra_body={"chat_template_kwargs": {"thinking": False}},
-        free=True,
+        billing=FREE,
         shadow_of="deepseek-flash",  # nearest priced paid equivalent until paid GLM is priced
     ),
     "nvidia-nemotron-3-ultra": Lane(
@@ -93,7 +117,7 @@ LANES: dict[str, Lane] = {
         NVIDIA_BASE_URL,
         "nvidia/nemotron-3-ultra",
         "NVIDIA_API_KEY",
-        free=True,
+        billing=FREE,
         shadow_of="deepseek-flash",
     ),
 }

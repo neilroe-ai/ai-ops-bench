@@ -51,6 +51,7 @@ class RunResult:
     cost_usd: float
     shadow_cost_usd: float | None
     completion: Completion
+    credit_usd: float = 0.0
 
 
 def no_prompt(message: str) -> str | None:
@@ -88,6 +89,7 @@ def shadow_cost(lane: Lane, at: datetime, completion: Completion) -> float | Non
         return rates.cost_usd(
             paid.model_id,
             rates.rate_window(paid.provider, at),
+            at=at,
             cache_hit_tokens=u.cache_hit_tokens,
             cache_miss_tokens=u.cache_miss_tokens,
             output_tokens=u.output_tokens,
@@ -158,6 +160,7 @@ def run_task(
                 model_id=lane.model_id,
                 rate_window=rates.FLAT,
                 dispatch_hour_utc=at.hour,
+                billing_mode=lane.billing,
                 cost_usd="0.000000",
                 status="throttled",
                 error=str(failure),
@@ -209,20 +212,31 @@ def _attempt(
         window,
         input_tokens=estimate_input_tokens(STANDING_INSTRUCTION + task_text),
         max_output_tokens=max_output_tokens,
+        at=dispatched,
     )
+    # Credit lanes spend no cash: the cash governor sees $0 and credit ceilings see the estimate.
+    cash_estimate = 0.0 if lane.promotional else estimate
+    if lane.promotional:
+        governor.authorize_credit(
+            lane.name,
+            estimate,
+            lifetime_usd=telemetry.credit_lane_spend(rows, lane.name),
+            month_usd=telemetry.credit_month_spend(rows, lane.name, dispatched.strftime("%Y-%m")),
+            at=dispatched,
+        )
     spend = governor.Spend(
         month_usd=telemetry.month_spend(rows, dispatched.strftime("%Y-%m")),
         session_usd=telemetry.window_spend(rows, dispatched, governor.SESSION_WINDOW_HOURS),
         lane_usd=telemetry.lane_spend(rows, lane.name),
     )
     try:
-        governor.authorize(lane.name, estimate, spend, session_override=bool(state["override"]))
+        governor.authorize(lane.name, cash_estimate, spend, session_override=bool(state["override"]))
     except governor.SessionLimitError as limit:
         reason = confirm_override(str(limit))
         if not reason:
             raise
         state["override"] = reason
-        governor.authorize(lane.name, estimate, spend, session_override=True)
+        governor.authorize(lane.name, cash_estimate, spend, session_override=True)
 
     completion = complete(
         lane,
@@ -233,13 +247,16 @@ def _attempt(
         timeout=FREE_LANE_TIMEOUT_S if lane.free else 600.0,
     )
     u = completion.usage
-    cost = rates.cost_usd(
+    list_cost = rates.cost_usd(
         lane.model_id,
         window,
+        at=dispatched,
         cache_hit_tokens=u.cache_hit_tokens,
         cache_miss_tokens=u.cache_miss_tokens,
         output_tokens=u.output_tokens,
     )
+    credit = list_cost if lane.promotional else 0.0
+    cost = 0.0 if lane.promotional else list_cost
     shadow = shadow_cost(lane, dispatched, completion)
 
     run_id, review_id = uuid.uuid4().hex[:12], uuid.uuid4().hex[:8]
@@ -257,6 +274,9 @@ def _attempt(
             model_version=completion.served_model,
             rate_window=window,
             dispatch_hour_utc=dispatched.hour,
+            billing_mode=lane.billing,
+            rate_card_date=rates.rate_card_date(lane.model_id, dispatched),
+            credit_usd=f"{credit:.6f}" if lane.promotional else "",
             cache_hit_tokens=u.cache_hit_tokens,
             cache_miss_tokens=u.cache_miss_tokens,
             output_tokens=u.output_tokens,
@@ -278,7 +298,7 @@ def _attempt(
         f"## Output\n\n{completion.text}\n",
         encoding="utf-8",
     )
-    return RunResult(run_id, review_id, lane.name, cost, shadow, completion)
+    return RunResult(run_id, review_id, lane.name, cost, shadow, completion, credit)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -310,7 +330,9 @@ def main(argv: list[str] | None = None) -> int:
     shadow = (
         "" if result.shadow_cost_usd is None else f"  (free; would have cost ${result.shadow_cost_usd:.6f})"
     )
-    print(f"run {result.run_id}  lane {result.lane}  review {result.review_id}  real cost {real}{shadow}")
+    credit = f"  (credit used ${result.credit_usd:.6f})" if result.credit_usd else ""
+    head = f"run {result.run_id}  lane {result.lane}  review {result.review_id}"
+    print(f"{head}  real cost {real}{shadow}{credit}")
     return 0
 
 

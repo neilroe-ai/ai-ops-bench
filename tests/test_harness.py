@@ -416,3 +416,115 @@ def test_breaker_skips_free_lane_after_repeated_throttles(tmp_path: Path) -> Non
     result = _run(tmp_path, calls, lane_name="nvidia-deepseek-v4-pro")
     assert all("nvidia" not in c["url"] for c in calls)
     assert result.lane == "deepseek-v4-pro"
+
+
+# ---- Gemini promotional credit: third money type ---------------------------
+
+from harness.client import CASH, FREE, PROMOTIONAL  # noqa: E402
+
+
+def test_rate_card_switches_on_1_jan_2027() -> None:
+    late = datetime(2026, 12, 31, 23, 59, tzinfo=UTC)
+    new = datetime(2027, 1, 1, 0, 0, tzinfo=UTC)
+    assert rates.get_rate("gemini-3.8-flash", rates.FLAT, late).output == 3.75
+    assert rates.get_rate("gemini-3.8-flash", rates.FLAT, new).output == 7.50
+    assert rates.rate_card_date("gemini-3.8-flash", new) == "2027-01-01"
+    assert rates.rate_card_date("deepseek-flash", new) == ""
+
+
+def test_dated_card_requires_dispatch_time() -> None:
+    with pytest.raises(rates.RateCardDateError):
+        rates.get_rate("gemini-3.8-flash", rates.FLAT)
+
+
+def test_every_lane_has_a_known_billing_mode() -> None:
+    for lane in LANES.values():
+        assert lane.billing in (CASH, FREE, PROMOTIONAL)
+        if lane.billing == PROMOTIONAL:
+            assert lane.name in governor.CREDIT_LANE_CEILING_USD
+            assert lane.name in governor.CREDIT_MONTHLY_CEILING_USD
+
+
+def test_credit_invariants_hold_for_committed_config() -> None:
+    governor.check_credit_invariants()
+
+
+@pytest.mark.parametrize(
+    ("attr", "value"),
+    [
+        ("CREDIT_LANE_CEILING_USD", {"gemini-3.8-flash": 10_000.0}),  # would drain promo, then prepay
+        ("CREDIT_MONTHLY_CEILING_USD", {"gemini-3.8-flash": 999.0}),  # above Tier 1 cap
+        ("PREPAY_BALANCE_TWD", {"google": 100.0}),  # below floor: credit would go inert
+    ],
+)
+def test_credit_invariants_fire(monkeypatch: pytest.MonkeyPatch, attr: str, value: dict[str, float]) -> None:
+    monkeypatch.setattr(governor, attr, value)
+    with pytest.raises(governor.CreditExhaustedError):
+        governor.check_credit_invariants()
+
+
+def gemini_transport(calls: list[dict[str, Any]]) -> Any:
+    def transport(url: str, headers: Mapping[str, str], body: bytes, timeout: float) -> dict[str, Any]:
+        calls.append({"url": url, "body": body})
+        return {
+            "model": "gemini-3.8-flash",
+            "choices": [{"message": {"content": "diagnosis"}, "finish_reason": "stop"}],
+            "usage": {
+                "prompt_tokens": 1000,
+                "completion_tokens": 500,
+                "completion_tokens_details": {"reasoning_tokens": 200},
+            },
+        }
+
+    return transport
+
+
+def _gemini(tmp_path: Path, calls: list[dict[str, Any]], **kw: Any) -> run.RunResult:
+    return _run(
+        tmp_path,
+        calls,
+        lane_name="gemini-3.8-flash",
+        transport=gemini_transport(calls),
+        env={"GEMINI_API_KEY": "k"},
+        **kw,
+    )
+
+
+def test_credit_run_spends_credit_not_cash(tmp_path: Path) -> None:
+    calls: list[dict[str, Any]] = []
+    result = _gemini(tmp_path, calls)
+    rows = telemetry.read(tmp_path / "t.csv")
+    row = rows[-1]
+    assert b'"reasoning_effort": "medium"' in calls[0]["body"]
+    assert result.cost_usd == 0.0 and result.credit_usd == pytest.approx((1000 * 0.75 + 500 * 3.75) / 1e6)
+    assert row["billing_mode"] == PROMOTIONAL and row["rate_card_date"] == "2026-01-01"
+    assert telemetry.month_spend(rows, "2026-09") == 0.0
+    assert report.reconcile(rows).get("google", 0.0) == 0.0
+    assert telemetry.credit_lane_spend(rows, "gemini-3.8-flash") == pytest.approx(result.credit_usd)
+    assert report.reconcile_credits(rows)["google"] == pytest.approx(
+        governor.credit_balance_usd("google") - result.credit_usd
+    )
+
+
+def test_credit_ceiling_is_hard_and_makes_no_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(governor, "CREDIT_LANE_CEILING_USD", {"gemini-3.8-flash": 0.0})
+    calls: list[dict[str, Any]] = []
+    with pytest.raises(governor.CreditExhaustedError):
+        _gemini(tmp_path, calls, override_reason="please")
+    assert calls == []
+
+
+def test_expired_credit_refuses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    expired = (governor.CreditGrant("google", 7924.50, MON.date()),)
+    monkeypatch.setattr(governor, "CREDIT_GRANTS", expired)
+    calls: list[dict[str, Any]] = []
+    with pytest.raises(governor.CreditExhaustedError):
+        _gemini(tmp_path, calls)
+    assert calls == []
+
+
+def test_cost_per_accepted_task_counts_credit_at_list_price() -> None:
+    r = _row("a", "diagnose", "0", lane="gemini-3.8-flash")
+    r["credit_usd"] = "0.05"
+    [lane_report] = report.lane_matrix([r], {"a": {"verdict": "accepted", "correction_rounds": "0"}})
+    assert lane_report.cost_per_accepted_task == pytest.approx(0.05)

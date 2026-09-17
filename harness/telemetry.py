@@ -27,7 +27,10 @@ FIELDS: tuple[str, ...] = (
     "output_tokens",
     "reasoning_tokens",
     "wall_clock_ms",
+    "billing_mode",  # cash | free | promotional
+    "rate_card_date",  # effective date of a dated rate card (e.g. Gemini 2026 vs 2027); blank otherwise
     "cost_usd",  # REAL money only. Every budget and reconciliation reads this column.
+    "credit_usd",  # promotional credit consumed at list price. Only credit ceilings read this.
     "shadow_cost_usd",  # what a free call would have cost on its paid lane. Never summed as spend.
     "lane_spend_usd",
     "fallback_from",  # free lane that failed before this paid call, if any
@@ -91,4 +94,24 @@ def lifetime_by_provider(rows: Iterable[Row]) -> dict[str, float]:
     totals: dict[str, float] = {}
     for r in rows:
         totals[r["provider"]] = totals.get(r["provider"], 0.0) + float(r["cost_usd"] or 0)
+    return totals
+
+
+def _credit(rows: Iterable[Row]) -> float:
+    return sum(float(r.get("credit_usd") or 0) for r in rows)
+
+
+def credit_lane_spend(rows: Iterable[Row], lane: str) -> float:
+    return _credit(r for r in rows if r["lane"] == lane)
+
+
+def credit_month_spend(rows: Iterable[Row], lane: str, yyyy_mm: str) -> float:
+    return _credit(r for r in rows if r["lane"] == lane and r["timestamp_utc"].startswith(yyyy_mm))
+
+
+def credit_lifetime_by_provider(rows: Iterable[Row]) -> dict[str, float]:
+    totals: dict[str, float] = {}
+    for r in rows:
+        if r.get("credit_usd"):
+            totals[r["provider"]] = totals.get(r["provider"], 0.0) + float(r["credit_usd"])
     return totals
