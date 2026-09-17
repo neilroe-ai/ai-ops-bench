@@ -1,0 +1,423 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ai-ops-bench \u2014 cost per accepted task",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1340,
+      480
+    ],
+    "repository": {
+      "url": "https://github.com/neilroe-ai/ai-ops-bench",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "b04a7afec74561d448b207d3d38a5421ace22b34"
+    },
+    "views": [
+      {
+        "id": "dispatch-path",
+        "label": "One dispatch",
+        "focus": [
+          "cli",
+          "rates",
+          "governor",
+          "client",
+          "providers"
+        ],
+        "note": "Follow one task from the CLI through the spend guards to a provider call."
+      },
+      {
+        "id": "money-guards",
+        "label": "Money guards",
+        "focus": [
+          "rates",
+          "governor",
+          "client",
+          "telemetry"
+        ],
+        "note": "The CSV that records spend is the same file the governor reads to refuse the next call."
+      },
+      {
+        "id": "blind-review",
+        "label": "Blind review loop",
+        "focus": [
+          "packets",
+          "neil",
+          "verdicts",
+          "report"
+        ],
+        "note": "Task and output reach the reviewer without a lane name; the CSV rejoins them by review_id."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "rates",
+      "type": "backend",
+      "label": "harness.rates",
+      "sublabel": "dated rate cards",
+      "pos": [
+        300,
+        30
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "sources": [
+        {
+          "path": "harness/rates.py",
+          "label": "rate cards"
+        }
+      ]
+    },
+    {
+      "id": "providers",
+      "type": "external",
+      "label": "Provider APIs",
+      "sublabel": "remote endpoints",
+      "tag": "BYOK",
+      "pos": [
+        820,
+        30
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "cli",
+      "type": "frontend",
+      "label": "harness.run",
+      "sublabel": "one task, one lane",
+      "pos": [
+        40,
+        190
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "sources": [
+        {
+          "path": "harness/run.py",
+          "line": 1,
+          "end_line": 9,
+          "label": "dispatch order"
+        }
+      ]
+    },
+    {
+      "id": "governor",
+      "type": "security",
+      "label": "harness.governor",
+      "sublabel": "spend ceilings",
+      "tag": "fail closed",
+      "pos": [
+        300,
+        190
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "sources": [
+        {
+          "path": "harness/governor.py",
+          "label": "ceilings"
+        }
+      ]
+    },
+    {
+      "id": "client",
+      "type": "backend",
+      "label": "harness.client",
+      "sublabel": "OpenAI-compatible",
+      "pos": [
+        560,
+        190
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "sources": [
+        {
+          "path": "harness/client.py",
+          "line": 52,
+          "label": "LANES"
+        }
+      ]
+    },
+    {
+      "id": "telemetry",
+      "type": "database",
+      "label": "data/telemetry.csv",
+      "sublabel": "one row per run",
+      "tag": "canonical",
+      "pos": [
+        820,
+        190
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "sources": [
+        {
+          "path": "harness/telemetry.py",
+          "line": 13,
+          "label": "FIELDS"
+        }
+      ]
+    },
+    {
+      "id": "report",
+      "type": "backend",
+      "label": "harness.report",
+      "sublabel": "lane matrix",
+      "pos": [
+        1080,
+        190
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "sources": [
+        {
+          "path": "harness/report.py",
+          "line": 44,
+          "label": "lane_matrix"
+        }
+      ]
+    },
+    {
+      "id": "packets",
+      "type": "database",
+      "label": "reviews/pending/",
+      "sublabel": "task + output only",
+      "pos": [
+        40,
+        350
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "sources": [
+        {
+          "path": "harness/run.py",
+          "line": 309,
+          "end_line": 313,
+          "label": "packet writer"
+        }
+      ]
+    },
+    {
+      "id": "neil",
+      "type": "external",
+      "label": "Neil",
+      "sublabel": "blind review",
+      "tag": "human only",
+      "pos": [
+        300,
+        350
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "verdicts",
+      "type": "database",
+      "label": "reviews/verdicts.csv",
+      "sublabel": "verdict + rounds",
+      "pos": [
+        560,
+        350
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "sources": [
+        {
+          "path": "harness/report.py",
+          "line": 20,
+          "label": "VERDICTS_PATH"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "dispatch path \u2014 stdlib only",
+      "wraps": [
+        "cli",
+        "governor",
+        "client"
+      ],
+      "pad": 18
+    },
+    {
+      "kind": "security-group",
+      "label": "hard ceilings",
+      "wraps": [
+        "governor"
+      ],
+      "pad": 8
+    }
+  ],
+  "connections": [
+    {
+      "id": "price-estimate",
+      "from": "rates",
+      "to": "governor",
+      "label": "price the estimate",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        380,
+        140
+      ]
+    },
+    {
+      "id": "ask-authorize",
+      "from": "cli",
+      "to": "governor",
+      "label": "authorize",
+      "variant": "emphasis"
+    },
+    {
+      "id": "under-ceiling",
+      "from": "governor",
+      "to": "client",
+      "label": "under ceiling",
+      "variant": "emphasis"
+    },
+    {
+      "id": "provider-call",
+      "from": "client",
+      "to": "providers",
+      "label": "HTTPS, key per lane",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [
+        [
+          640,
+          140
+        ],
+        [
+          900,
+          140
+        ]
+      ]
+    },
+    {
+      "id": "log-run",
+      "from": "client",
+      "to": "telemetry",
+      "label": "usage + real cost",
+      "variant": "emphasis"
+    },
+    {
+      "id": "read-rows",
+      "from": "telemetry",
+      "to": "report",
+      "label": "read rows",
+      "variant": "emphasis"
+    },
+    {
+      "id": "spend-to-date",
+      "from": "telemetry",
+      "to": "governor",
+      "label": "lane spend to date",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          900,
+          290
+        ],
+        [
+          380,
+          290
+        ]
+      ]
+    },
+    {
+      "id": "write-packet",
+      "from": "cli",
+      "to": "packets",
+      "label": "blind packet",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        120,
+        300
+      ]
+    },
+    {
+      "id": "review-packet",
+      "from": "packets",
+      "to": "neil",
+      "label": "no lane name"
+    },
+    {
+      "id": "record-verdict",
+      "from": "neil",
+      "to": "verdicts",
+      "label": "accepted / rejected"
+    },
+    {
+      "id": "join-by-review-id",
+      "from": "verdicts",
+      "to": "report",
+      "label": "join on review_id",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "via": [
+        [
+          1160,
+          380
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Three money types, never mixed",
+      "items": [
+        "cash spends cost_usd under monthly and per-lane ceilings",
+        "free NVIDIA lanes cost nothing and price shadow_cost_usd for reporting",
+        "promotional credit spends credit_usd under lifetime and expiry limits"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Order of one run",
+      "items": [
+        "breaker, window, invariant, estimate, authorize, call, log",
+        "the session ceiling alerts and pauses; non-interactive runs stop",
+        "a throttled free lane falls back to its paid shadow_of lane"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "What the harness refuses to decide",
+      "items": [
+        "Only the CSV promotes a lane; a new model enters as a row",
+        "Claude Pro is never a lane and never authenticates here",
+        "Neil logs the choice in docs/model-decisions.md"
+      ]
+    }
+  ]
+}
