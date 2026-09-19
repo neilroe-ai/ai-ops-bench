@@ -4,3 +4,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .env
+
+# Run artifacts. Regenerated every run, and they accumulate — telemetry is a
+# log, and a pending review is a queue state, not a result. Benchmark results
+# that cost API calls to reproduce live in research/ and ARE tracked.
+data/
+reviews/pending/

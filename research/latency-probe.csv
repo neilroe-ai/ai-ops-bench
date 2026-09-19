@@ -1,0 +1,61 @@
+ts,model,rep,ok,ttft_ms,total_ms,completion_tokens,error
+2026-09-18T07:20:20+00:00,nvidia/nemotron-3-ultra-550b-a55b,1,1,11196,11196,,
+2026-09-18T07:20:32+00:00,nvidia/nemotron-3-ultra-550b-a55b,2,1,18383,18626,,
+2026-09-18T07:20:52+00:00,nvidia/nemotron-3-ultra-550b-a55b,3,1,16022,16023,,
+2026-09-18T07:21:09+00:00,nvidia/nemotron-3-ultra-550b-a55b,4,1,9050,9050,,
+2026-09-18T07:21:19+00:00,nvidia/nemotron-3-ultra-550b-a55b,5,1,6082,6082,,
+2026-09-18T07:21:26+00:00,nvidia/nemotron-3-super-120b-a12b,1,1,912,1208,,
+2026-09-18T07:21:28+00:00,nvidia/nemotron-3-super-120b-a12b,2,1,1335,1613,,
+2026-09-18T07:21:31+00:00,nvidia/nemotron-3-super-120b-a12b,3,1,1831,2362,,
+2026-09-18T07:21:34+00:00,nvidia/nemotron-3-super-120b-a12b,4,1,8345,8346,,
+2026-09-18T07:21:44+00:00,nvidia/nemotron-3-super-120b-a12b,5,1,,139,,
+2026-09-18T07:21:45+00:00,z-ai/glm-5.3,1,0,,,,TimeoutError: The read operation timed out
+2026-09-18T07:24:46+00:00,z-ai/glm-5.3,2,1,,202220,,
+2026-09-18T07:28:09+00:00,z-ai/glm-5.3,3,0,,,,TimeoutError: The read operation timed out
+2026-09-18T07:31:10+00:00,z-ai/glm-5.3,4,0,,,,TimeoutError: The read operation timed out
+2026-09-18T07:34:12+00:00,z-ai/glm-5.3,5,1,,180322,,
+2026-09-18T07:37:13+00:00,z-ai/glm-5.3-flash,1,1,22257,22975,,
+2026-09-18T07:37:37+00:00,z-ai/glm-5.3-flash,2,1,15825,16662,,
+2026-09-18T07:37:55+00:00,z-ai/glm-5.3-flash,3,1,31317,32702,,
+2026-09-18T07:38:28+00:00,z-ai/glm-5.3-flash,4,1,11528,12717,,
+2026-09-18T07:38:42+00:00,z-ai/glm-5.3-flash,5,1,,16026,,
+2026-09-18T07:38:59+00:00,deepseek-ai/deepseek-v4-flash-0731,1,1,,26676,,
+2026-09-18T07:39:27+00:00,deepseek-ai/deepseek-v4-flash-0731,2,1,5375,10295,,
+2026-09-18T07:39:38+00:00,deepseek-ai/deepseek-v4-flash-0731,3,1,,11071,,
+2026-09-18T07:39:50+00:00,deepseek-ai/deepseek-v4-flash-0731,4,1,,8268,,
+2026-09-18T07:39:59+00:00,deepseek-ai/deepseek-v4-flash-0731,5,1,,12128,,
+2026-09-18T07:40:13+00:00,moonshotai/kimi-k3,1,0,,,,TimeoutError: The read operation timed out
+2026-09-18T07:43:14+00:00,moonshotai/kimi-k3,2,0,,,,TimeoutError: The read operation timed out
+2026-09-18T07:46:15+00:00,moonshotai/kimi-k3,3,0,,,,TimeoutError: The read operation timed out
+2026-09-18T07:49:16+00:00,moonshotai/kimi-k3,4,0,,,,TimeoutError: The read operation timed out
+2026-09-18T07:52:17+00:00,moonshotai/kimi-k3,5,0,,,,TimeoutError: The read operation timed out
+2026-09-18T08:23:52+00:00,nvidia/nemotron-3-ultra-550b-a55b,1,1,2151,2151,,
+2026-09-18T08:23:55+00:00,nvidia/nemotron-3-ultra-550b-a55b,2,1,4589,4589,,
+2026-09-18T08:24:00+00:00,nvidia/nemotron-3-ultra-550b-a55b,3,1,1853,1853,,
+2026-09-18T08:24:03+00:00,nvidia/nemotron-3-ultra-550b-a55b,4,1,2599,2600,,
+2026-09-18T08:24:07+00:00,nvidia/nemotron-3-ultra-550b-a55b,5,1,,357,,
+2026-09-18T08:24:08+00:00,nvidia/nemotron-3-super-120b-a12b,1,1,1648,2496,,
+2026-09-18T08:24:12+00:00,nvidia/nemotron-3-super-120b-a12b,2,1,,207,,
+2026-09-18T08:24:13+00:00,nvidia/nemotron-3-super-120b-a12b,3,1,1185,1455,,
+2026-09-18T08:24:15+00:00,nvidia/nemotron-3-super-120b-a12b,4,1,1022,1458,,
+2026-09-18T08:24:18+00:00,nvidia/nemotron-3-super-120b-a12b,5,1,2314,2749,,
+2026-09-18T08:24:21+00:00,z-ai/glm-5.3,1,1,,164792,,
+2026-09-18T08:27:07+00:00,z-ai/glm-5.3,2,1,,166567,,
+2026-09-18T08:29:55+00:00,z-ai/glm-5.3,3,1,,120217,,
+2026-09-18T08:31:56+00:00,z-ai/glm-5.3,4,1,,110240,,
+2026-09-18T08:33:47+00:00,z-ai/glm-5.3,5,1,,105673,,
+2026-09-18T08:35:34+00:00,z-ai/glm-5.3-flash,1,1,24991,25177,,
+2026-09-18T08:36:00+00:00,z-ai/glm-5.3-flash,2,1,15801,16856,,
+2026-09-18T08:36:18+00:00,z-ai/glm-5.3-flash,3,1,,26528,,
+2026-09-18T08:36:45+00:00,z-ai/glm-5.3-flash,4,1,20259,21016,,
+2026-09-18T08:37:08+00:00,z-ai/glm-5.3-flash,5,1,32370,32556,,
+2026-09-18T08:37:41+00:00,deepseek-ai/deepseek-v4-flash-0731,1,1,,24089,,
+2026-09-18T08:38:06+00:00,deepseek-ai/deepseek-v4-flash-0731,2,1,3331,7731,,
+2026-09-18T08:38:15+00:00,deepseek-ai/deepseek-v4-flash-0731,3,1,8652,9088,,
+2026-09-18T08:38:25+00:00,deepseek-ai/deepseek-v4-flash-0731,4,1,,12332,,
+2026-09-18T08:38:38+00:00,deepseek-ai/deepseek-v4-flash-0731,5,1,9389,14613,,
+2026-09-18T08:38:54+00:00,moonshotai/kimi-k3,1,0,,,,TimeoutError: The read operation timed out
+2026-09-18T08:41:55+00:00,moonshotai/kimi-k3,2,0,,,,TimeoutError: The read operation timed out
+2026-09-18T08:44:56+00:00,moonshotai/kimi-k3,3,0,,,,TimeoutError: The read operation timed out
+2026-09-18T08:47:57+00:00,moonshotai/kimi-k3,4,0,,,,TimeoutError: The read operation timed out
+2026-09-18T13:07:49+00:00,moonshotai/kimi-k3,5,0,,,,TimeoutError: The read operation timed out
