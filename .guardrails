@@ -1,0 +1,14 @@
+# What this repo checks, and when. Read by ~/.githooks/pre-commit.
+#
+# uv resolves the dev dependency group on demand, so nothing is installed
+# globally and the declaration cannot drift from pyproject.toml.
+commit="uv run --group dev ruff check $GR_STAGED"
+# Scoped to what is actually being committed, not the whole tree: untracked
+# work-in-progress is not part of this commit and must not block it.
+
+commit_needs="uv"
+
+push="uv run --group dev pytest -q"
+push_needs="uv"
+
+skip='\.(md|txt|png|jpg|jpeg|webp|gif|ico|svg)$|^docs/'
