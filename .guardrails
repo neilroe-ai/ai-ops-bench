@@ -2,7 +2,7 @@
 #
 # uv resolves the dev dependency group on demand, so nothing is installed
 # globally and the declaration cannot drift from pyproject.toml.
-commit="uv run --group dev ruff check $GR_STAGED"
+commit='[ -z "$GR_STAGED_PY" ] || uv run --group dev ruff check $GR_STAGED_PY'
 # Scoped to what is actually being committed, not the whole tree: untracked
 # work-in-progress is not part of this commit and must not block it.
 
